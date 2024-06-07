@@ -1,13 +1,7 @@
-# your_app/views.py
-
 from django.shortcuts import render, redirect
 from django.conf import settings
 from .models import Profile
-from .forms import SignUpForm
-from django.db import transaction
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.models import User
 import requests
 import json
 
@@ -61,14 +55,28 @@ def save_linkedin_data(linkedin_data, user):
     last_name = linkedin_data.get('localizedLastName', '')
     profile_picture = linkedin_data.get('profilePicture', {}).get('displayImage', '')
 
-    profile, _ = Profile.objects.get_or_create(user=user)
-    profile.first_name = first_name
-    profile.last_name = last_name
-    profile.email = email
-    profile.picture = profile_picture
-    profile.save()
-    print("Profile saved successfully.")
+    profile, created = Profile.objects.get_or_create(user=user)
+    
+    updated = False
+
+    if profile.first_name != first_name:
+        profile.first_name = first_name
+        updated = True
+    if profile.last_name != last_name:
+        profile.last_name = last_name
+        updated = True
+    if profile.email != email:
+        profile.email = email
+        updated = True
+    if profile.picture != profile_picture:
+        profile.picture = profile_picture
+        updated = True
+
+    if updated or created:
+        profile.save()
+        print("Profile saved successfully.")
+    else:
+        print("Profile is up to date, no changes made.")
 
 def signup_view(request):
     return render(request, 'signup.html')
-

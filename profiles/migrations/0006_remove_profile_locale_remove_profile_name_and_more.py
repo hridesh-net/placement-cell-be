@@ -8,7 +8,6 @@ class Migration(migrations.Migration):
     dependencies = [
         ('profiles', '0005_profile_alter_education_user_profile_and_more'),
     ]
-
     operations = [
         migrations.RemoveField(
             model_name='profile',
