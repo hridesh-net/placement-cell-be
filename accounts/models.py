@@ -1,6 +1,15 @@
 from rest_framework.authtoken.models import Token
 
 from django.db import models
+
+class Profile(models.Model):
+    name = models.CharField(max_length=255, blank=True, null=True)
+    email = models.EmailField(unique=True)
+    locale = models.CharField(max_length=255, blank=True, null=True)
+    picture = models.URLField(blank=True, null=True)
+
+    def __str__(self):
+        return self.user.username
 from django.utils.translation import gettext as _
 from django.contrib.auth.models import AbstractUser
 

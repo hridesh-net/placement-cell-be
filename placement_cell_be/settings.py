@@ -23,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-n%7&j$be!097(4^!dnhic5u2qke!)#rku(xu)etb9y_w4lia#="
+SECRET_KEY = os.environ.get('SECRET_KEY_DJANGO')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -45,6 +45,16 @@ INSTALLED_APPS = [
     "applicant",
 ]
 
+EXTERNAL_APPS = [
+    'accounts',
+    'home',
+    'jobs',
+    'utils',
+]
+
+INSTALLED_APPS += EXTERNAL_APPS
+
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -54,6 +64,12 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+LINKEDIN_REDIRECT_URI = "http://localhost:8000/accounts/linkedin/callback"
+LINKEDIN_CLIENT_ID = os.environ.get('LINKEDIN_CLIENT_ID')
+LINKEDIN_CLIENT_SECRET = os.environ.get('LINKEDIN_CLIENT_SECRET')
+
+
 
 ROOT_URLCONF = "placement_cell_be.urls"
 
