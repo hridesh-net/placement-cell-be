@@ -1,58 +1,28 @@
+# accounts/admin.py
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-
-from .models import CustomUser
-
-# Register your models here.
+from .models import CustomUser, Profile
 
 
 class CustomUserAdmin(UserAdmin):
-
     model = CustomUser
-
-    list_display = (
-        "username",
-        "email",
-        "is_active",
-        "is_staff",
-        "is_superuser",
-        "last_login",
-    )
-    list_filter = ("is_active", "is_staff", "is_superuser")
+    list_display = ['email', 'username', 'first_name',
+                    'last_name', 'is_staff', 'is_active', ]
     fieldsets = (
-        (None, {"fields": ("username", "email", "password")}),
-        (
-            "Permissions",
-            {
-                "fields": (
-                    "is_staff",
-                    "is_active",
-                    "is_superuser",
-                    "groups",
-                    "user_permissions",
-                )
-            },
-        ),
-        ("Dates", {"fields": ("last_login", "date_joined")}),
+        (None, {'fields': ('email', 'password', 'username')}),
+        ('Personal info', {'fields': ('first_name', 'last_name')}),
+        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser',
+                                    'groups', 'user_permissions')}),
+        ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
     add_fieldsets = (
-        (
-            None,
-            {
-                "classes": ("wide",),
-                "fields": (
-                    "username",
-                    "email",
-                    "password1",
-                    "password2",
-                    "is_staff",
-                    "is_active",
-                ),
-            },
-        ),
+        (None, {
+            'classes': ('wide',),
+            'fields': ('email', 'first_name', 'username', 'last_name', 'password1', 'password2', 'is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
+        }),
     )
-    search_fields = ("email",)
-    ordering = ("email",)
+    ordering = ['email']  # Use 'email' for ordering
 
 
 admin.site.register(CustomUser, CustomUserAdmin)
+admin.site.register(Profile)

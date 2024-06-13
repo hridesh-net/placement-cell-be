@@ -1,66 +1,130 @@
+import jwt
+import requests
 
-from rest_framework import status
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.authtoken.models import Token
+from .models import Profile
+from .forms import SignUpForm
+from django.conf import settings
+from django.db import transaction
+from urllib.parse import urlencode
+from django.contrib.auth.models import User
+from django.shortcuts import render, redirect
+from django.contrib.auth import login, authenticate
+from django.contrib.auth import views as auth_views
+from django.contrib.auth import logout, get_user_model
+from django.contrib.auth.forms import AuthenticationForm
 
-from django.utils import timezone
-from django.contrib.auth import authenticate
-
-from .serializers import UserLoginSerializer, UserSignupSerializer
-from .models import CustomUser
-
-# Create your views here.
+User = get_user_model()
 
 
-class LoginAPIView(APIView):
-    def post(self, request):
-        email = request.data.get("email")
+def signup_view(request):
+    if request.method == 'POST':
+        form = SignUpForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            Profile.objects.create(user=user)
+            email = form.cleaned_data.get('email')
+            password = form.cleaned_data.get('password1')
+            user = authenticate(email=email, password=password)
+            login(request, user)
+            return redirect('home')
+    else:
+        form = SignUpForm()
+    return render(request, 'accounts/signup.html', {'form': form})
 
-        if not email:
-            return Response(
-                {"error": "email required"}, status=status.HTTP_400_BAD_REQUEST
-            )
 
-        usr = CustomUser.objects.filter(email=email).first()
-        if not usr:
-            return Response(
-                {"error": "No user with following email"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+class CustomLoginView(auth_views.LoginView):
+    template_name = 'accounts/login.html'
+    redirect_authenticated_user = True
 
-        try:
-            user = authenticate(
-                email=usr.email, password=request.data.get("password").strip()
-            )
-            if user:
-                user.last_login = timezone.now()
-                user.save()
 
-                # Serialize user data
-                serializer = UserLoginSerializer(user)
-                response_data = serializer.data
-                return Response(response_data, status=status.HTTP_200_OK)
+def login_view(request):
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            username = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                login(request, user)
+                return redirect('home')
+    else:
+        form = AuthenticationForm()
+    return render(request, 'accounts/login.html', {'form': form})
+
+
+def password_reset_view(request):
+    return render(request, 'accounts/password_reset.html')
+
+
+def linkedin_login(request):
+    params = {
+        'response_type': 'code',
+        'client_id': settings.LINKEDIN_CLIENT_ID,
+        'redirect_uri': settings.LINKEDIN_REDIRECT_URI,
+        'scope': 'profile email openid'
+    }
+    url = 'https://www.linkedin.com/oauth/v2/authorization?' + \
+        urlencode(params)
+    return redirect(url)
+
+
+def linkedin_callback(request):
+    code = request.GET.get('code')
+    if code:
+        params = {
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': settings.LINKEDIN_REDIRECT_URI,
+            'client_id': settings.LINKEDIN_CLIENT_ID,
+            'client_secret': settings.LINKEDIN_CLIENT_SECRET,
+        }
+        response = requests.post(
+            'https://www.linkedin.com/oauth/v2/accessToken', data=params)
+        access_token = response.json().get('access_token')
+        id_token = response.json().get('id_token')  # Extract the ID token
+
+        if not access_token or not id_token:
+            return render(request, 'accounts/login.html', {'error': 'Authentication failed'})
+
+        decoded_id_token = jwt.decode(
+            id_token, options={"verify_signature": False})
+        email = decoded_id_token.get('email')
+        given_name = decoded_id_token.get('given_name')
+        family_name = decoded_id_token.get('family_name')
+        name = decoded_id_token.get('name')
+        picture = decoded_id_token.get('picture')
+        locale = decoded_id_token.get('locale')
+
+        with transaction.atomic():
+            user, created = User.objects.get_or_create(email=email, defaults={
+                                                       'first_name': given_name, 'last_name': family_name, 'username': email})
+            if created:
+                profile = Profile.objects.create(
+                    user=user, name=name, email=email, locale=locale, linkedin_photo_url=picture)
+                profile.download_linkedin_photo()
             else:
-                return Response(
-                    {"error": "Invalid credentials"},
-                    status=status.HTTP_401_UNAUTHORIZED,
-                )
-        except Exception as e:
-            return Response({"error": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                user.first_name = given_name
+                user.last_name = family_name
+                user.email = email
+                user.save()
+                profile = Profile.objects.get(user=user)
+                profile.name = name
+                profile.email = email
+                profile.locale = locale
+                profile.linkedin_photo_url = picture
+                profile.save()
+                if not profile.profile_photo:
+                    profile.download_linkedin_photo()
+
+        login(request, user)
+        return redirect('home')
+    return render(request, 'accounts/login.html', {'error': 'Authentication failed'})
 
 
-class SignupAPIView(APIView):
-    def post(self, request):
-        print(request.data)
-        serializer = UserSignupSerializer(data=request.data)
-        if serializer.is_valid():
-            try:
-                user = serializer.save()
-                return Response(
-                    {"message": "User created successfully"},
-                    status=status.HTTP_201_CREATED,
-                )
-            except Exception as e:
-                return Response({"error": f"{e}"}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+def logout_view(request):
+    return render(request, 'accounts/logout.html')
+
+
+def logout_confirm_view(request):
+    logout(request)
+    return redirect('login')
